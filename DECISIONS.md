@@ -1,0 +1,7 @@
+# Implementation decisions
+
+1. **Indexes.** Unique `employees.emp_code` protects identity and supports lookups. `employees(department, joined_on)` serves filtered headcount; `employees(joined_on)` serves all-department summaries; `employees(department, emp_code)` supports department queries. Unique `attendance_logs(emp_code, date)` enforces one record per day and supports employee/month lookups. `attendance_logs(date DESC, emp_code)` serves date queries; `attendance_logs(emp_code, punch_in DESC)` supports punch history. I rejected a separate employee/date-desc index because the unique employee/date index already has that key order.
+2. **Punch-in race.** Requests may both pass the initial lookup, but the unique employee/date index permits one insert. The winner succeeds; the other's duplicate-key error becomes 409. The lookup is an early conflict check, not the concurrency guarantee.
+3. **Ties.** Ranking occurs before the limit. Employees tied at the cutoff rank are all included, ordered by `emp_code`.
+4. **Headcount.** Summary starts from eligible employee documents and looks up logs. An employee with no logs remains with an empty log array, counts in headcount, and adds zero attendance.
+5. **At 100x scale.** I would benchmark representative data and real explain plans, then consider pre-aggregated summaries if latency or resource use is high. Fake database tests cannot prove real query performance or index use.
